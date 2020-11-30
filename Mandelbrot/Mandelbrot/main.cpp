@@ -12,6 +12,12 @@
 #include <future>
 
 using namespace std::chrono_literals;
+//Control structures
+const auto save_images{ false };
+auto const cpu_seq{ true };
+auto const cpu_thread{ true };
+auto const cpu_task{ true };
+auto const gpu{ true };
 
 const auto jobFile{ "./jobs-010.txt" };
 jobs <> const j{ jobFile };
@@ -35,7 +41,6 @@ auto timed_run(F&& f, A &&... a)
 }
 
 // Mandelbrot
-
 void mandelOnePicture(const int index, const float leftReal, const float lowerImg, const float spanReal, const float spanImg) {
 	pfc::bitmap bmp{ width, height };
 	auto& span{ bmp.pixel_span() };
@@ -50,17 +55,13 @@ void mandelOnePicture(const int index, const float leftReal, const float lowerIm
 	}
 
 	//save mandel image
-	
-	std::string fileName = "./mandel-";
-	fileName.append(std::to_string(index));
-	fileName.append(".bmp");
-	bmp.to_file(fileName);
-	
+	if (save_images) {
+		bmp.to_file("./mandel-" + std::to_string(index) + ".bmp");
+	}
 }
 
 void calc_on_cpu_seq() {
 	std::cout << "start cpu seq" << std::endl;
-
 	float leftReal{  };
 	float lowerImg{  };
 
@@ -81,7 +82,6 @@ void calc_on_cpu_seq() {
 
 void calc_on_cpu_threads() {
 	std::cout << "start cpu threads" << std::endl;
-
 	std::vector<std::thread> threads = {};
 	threads.resize(size);
 
@@ -109,7 +109,6 @@ void calc_on_cpu_threads() {
 
 void calc_on_cpu_tasks() {
 	std::cout << "start cpu task" << std::endl;
-
 	std::vector<std::future<void>> tasks = {};
 	tasks.resize(size);
 
@@ -126,7 +125,7 @@ void calc_on_cpu_tasks() {
 
 		spanReal = real(j.get_size(i));
 		spanImg = imag(j.get_size(i));
-		tasks[i] = std::async(std::launch::async, mandelOnePicture, i, leftReal, lowerImg, spanReal, spanImg );
+		tasks[i] = std::async(std::launch::async, mandelOnePicture, i, leftReal, lowerImg, spanReal, spanImg);
 	}
 
 	for (int i = size - 1; i >= 0; i--)
@@ -163,7 +162,6 @@ void calc_on_gpu() {
 		float* dSpanImg{};
 		check(cudaMalloc(&dSpanImg, sizeof(float)));
 
-
 		pfc::pixel_t* dPuffer{};
 		check(cudaMalloc(&dPuffer, width * height * sizeof(pfc::pixel_t)));
 
@@ -180,52 +178,94 @@ void calc_on_gpu() {
 			check(cudaMemcpy(dSpanReal, &hSpanReal, sizeof(float), cudaMemcpyHostToDevice));
 			check(cudaMemcpy(dSpanImg, &hSpanImg, sizeof(float), cudaMemcpyHostToDevice));
 
-			call_mandel_kernel(dLeftReal, dLowerImg, dSpanReal, dSpanImg, dPuffer, width*height, 128);
+			call_mandel_kernel(dLeftReal, dLowerImg, dSpanReal, dSpanImg, dPuffer, width * height, 128);
 
 			check(cudaMemcpy(p_buffer, dPuffer, width * height * sizeof(pfc::pixel_t), cudaMemcpyDeviceToHost));
 
 			//save mandel image
-			/*
-			std::string fileName = "./mandel-";
-			fileName.append(std::to_string(i));
-			fileName.append(".bmp");
-			bmp.to_file(fileName);
-			*/
+			if (save_images) {
+				bmp.to_file("./mandel-" + std::to_string(i) + ".bmp");
+			}
 		}
 		check(cudaFree(dPuffer));
 		check(cudaFree(dSpanImg));
 		check(cudaFree(dSpanReal));
-		check(cudaFree(dLowerImg));		
+		check(cudaFree(dLowerImg));
 		check(cudaFree(dLeftReal));
 	}
 	check(cudaDeviceReset());
 }
 
 int main() {
+	std::chrono::nanoseconds elapsed_cpu_seq;
+	std::chrono::nanoseconds elapsed_cpu_thread;
+	std::chrono::nanoseconds elapsed_cpu_task;
+	std::chrono::nanoseconds elapsed_gpu;
+
 	//CPU_seq
-	auto const elapsed_cpu_seq{ timed_run([] {calc_on_cpu_seq(); }) };
+	if (cpu_seq)
+		elapsed_cpu_seq = timed_run([] {calc_on_cpu_seq(); });
 
 	//CPU_thread
-	//auto const elapsed_cpu_thread{ timed_run([] {calc_on_cpu_threads(); }) };
+	if (cpu_thread)
+		elapsed_cpu_thread = timed_run([] {calc_on_cpu_threads(); });
 
 	//CPU_task
-	//auto const elapsed_cpu_task{ timed_run([] {calc_on_cpu_tasks(); }) };
+	if (cpu_task)
+		elapsed_cpu_task = timed_run([] {calc_on_cpu_tasks(); });
 
 	//GPU		   
-	//auto const elapsed_gpu{ timed_run([] {calc_on_gpu(); }) };
+	if (gpu)
+		elapsed_gpu = timed_run([] {calc_on_gpu(); });
 
 	std::cout << "number of pictures: " << j.size() << std::endl;
 	std::cout << "====== times =====" << std::endl;
-	//std::cout << "cpu seq time: " << to_seconds(elapsed_cpu_seq) << " s" << std::endl;
-	//std::cout << "cpu thread time: " << to_seconds(elapsed_cpu_thread) << " s" << std::endl;
-	//std::cout << "cpu task time: " << to_seconds(elapsed_cpu_task) << " s" << std::endl;
-	//std::cout << "gpu time: " << to_seconds(elapsed_gpu) << " s" << std::endl;
+	if (cpu_seq)
+		std::cout << "cpu seq time: " << to_seconds(elapsed_cpu_seq) << " s" << std::endl;
+
+	if (cpu_thread)
+		std::cout << "cpu thread time: " << to_seconds(elapsed_cpu_thread) << " s" << std::endl;
+
+	if (cpu_task)
+		std::cout << "cpu task time: " << to_seconds(elapsed_cpu_task) << " s" << std::endl;
+
+	if (gpu)
+		std::cout << "gpu time: " << to_seconds(elapsed_gpu) << " s" << std::endl;
 
 	std::cout << "====== Speed Up =====" << std::endl;
-	//std::cout << "speedup cpu seq to cpu thread: " << to_seconds(elapsed_cpu_seq) / to_seconds(elapsed_cpu_thread) << std::endl;
-	//std::cout << "speedup cpu seq to cpu task: " << to_seconds(elapsed_cpu_seq) / to_seconds(elapsed_cpu_thread) << std::endl;
-	//std::cout << "speedup cpu thread to cpu task: " << to_seconds(elapsed_cpu_thread) / to_seconds(elapsed_cpu_task) << std::endl;
-	//std::cout << "speedup cpu thread to gpu: " << to_seconds(elapsed_cpu_thread) / to_seconds(elapsed_gpu) << std::endl;
-	//std::cout << "speedup cpu task to gpu: " << to_seconds(elapsed_cpu_task) / to_seconds(elapsed_gpu) << std::endl;
+	if (cpu_seq && cpu_thread)
+		std::cout << "speedup cpu seq to cpu thread: " << to_seconds(elapsed_cpu_seq) / to_seconds(elapsed_cpu_thread) << std::endl;
+
+	if (cpu_seq && cpu_task)
+		std::cout << "speedup cpu seq to cpu task: " << to_seconds(elapsed_cpu_seq) / to_seconds(elapsed_cpu_thread) << std::endl;
+
+	if (cpu_thread && cpu_task)
+		std::cout << "speedup cpu thread to cpu task: " << to_seconds(elapsed_cpu_thread) / to_seconds(elapsed_cpu_task) << std::endl;
+
+	if (cpu_seq && gpu)
+		std::cout << "speedup cpu seq to gpu: " << to_seconds(elapsed_cpu_seq) / to_seconds(elapsed_gpu) << std::endl;
+
+	if (cpu_thread && gpu)
+		std::cout << "speedup cpu thread to gpu: " << to_seconds(elapsed_cpu_thread) / to_seconds(elapsed_gpu) << std::endl;
+
+	if (cpu_task && gpu)
+		std::cout << "speedup cpu task to gpu: " << to_seconds(elapsed_cpu_task) / to_seconds(elapsed_gpu) << std::endl;
 
 }
+
+
+/*baseline
+number of pictures: 10
+====== times =====
+cpu seq time: 433.377 s
+cpu thread time: 45.7348 s
+cpu task time: 44.9392 s
+gpu time: 0.695617 s
+====== Speed Up =====
+speedup cpu seq to cpu thread: 9.47588
+speedup cpu seq to cpu task: 9.47588
+speedup cpu thread to cpu task: 1.0177
+speedup cpu seq to gpu: 623.011
+speedup cpu thread to gpu: 65.7471
+speedup cpu task to gpu: 64.6034
+*/
