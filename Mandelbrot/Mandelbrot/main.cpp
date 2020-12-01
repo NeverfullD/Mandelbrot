@@ -14,12 +14,12 @@
 using namespace std::chrono_literals;
 //Control structures
 const auto save_images{ false };
-auto const cpu_seq{ true };
-auto const cpu_thread{ true };
-auto const cpu_task{ true };
+auto const cpu_seq{ false };
+auto const cpu_thread{ false };
+auto const cpu_task{ false };
 auto const gpu{ true };
 
-const auto jobFile{ "./jobs-010.txt" };
+const auto jobFile{ "./jobs-200.txt" };
 jobs <> const j{ jobFile };
 const auto size = j.size();
 
