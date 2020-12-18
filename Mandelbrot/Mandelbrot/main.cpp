@@ -16,12 +16,14 @@ using namespace std::chrono_literals;
 const auto save_images{ false };
 auto const cpu_seq{ false };
 auto const cpu_thread{ false };
-auto const cpu_task{ false };
+auto const threadCnt{ 6 };
+auto const cpu_task{ true };
 auto const gpu{ true };
 
-const auto jobFile{ "./jobs-200.txt" };
+const auto jobFile{ "./jobs-010.txt" };
 jobs <> const j{ jobFile };
 const auto size = j.size();
+auto const batch_size = size / threadCnt;
 
 template <typename... T>
 double to_seconds(std::chrono::duration<T...> const duration)
@@ -80,28 +82,42 @@ void calc_on_cpu_seq() {
 	}
 }
 
-void calc_on_cpu_threads() {
-	std::cout << "start cpu threads" << std::endl;
-	std::vector<std::thread> threads = {};
-	threads.resize(size);
-
+//cpu parallel thread
+void mandel_thread(int const start, int const end) {
 	float leftReal{  };
 	float lowerImg{  };
 
 	float spanReal{  };
 	float spanImg{  };
 
-	for (int i = 0; i < size; i++)
+	for (int i = start; i <= end; i++)
 	{
 		leftReal = real(j.get_lower_left(i));
 		lowerImg = imag(j.get_lower_left(i));
 
 		spanReal = real(j.get_size(i));
 		spanImg = imag(j.get_size(i));
-		threads[i] = std::thread{ mandelOnePicture, i, leftReal, lowerImg, spanReal, spanImg };
+		mandelOnePicture( i, leftReal, lowerImg, spanReal, spanImg);
+	}
+}
+
+void calc_on_cpu_threads() {
+	std::cout << "start cpu threads" << std::endl;
+	std::vector<std::thread> threads = {};
+	threads.resize(threadCnt);
+
+	for (size_t i = 0; i < threadCnt; i++)
+	{
+		if (i == threadCnt - 1) {
+			threads[i] = std::thread{ mandel_thread, batch_size * i, size - 1 };
+		}
+		else
+		{
+			threads[i] = std::thread{ mandel_thread, batch_size * i, batch_size * (i + 1) - 1 };
+		}
 	}
 
-	for (int i = size - 1; i >= 0; i--)
+	for (int i = threadCnt - 1; i >= 0; i--)
 	{
 		threads[i].join();
 	}
