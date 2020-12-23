@@ -19,8 +19,9 @@ auto const cpu_thread{ false };
 auto const threadCnt{ 6 };
 auto const cpu_task{ false };
 auto const gpu{ true };
+auto const threadCntGPU{ 3 };
 
-const auto jobFile{"C:/GIT/MPV/Mandelbrot/Mandelbrot/Mandelbrot/jobs-200.txt" };
+const auto jobFile{ "C:/GIT/MPV/Mandelbrot/Mandelbrot/Mandelbrot/jobs-005.txt" };
 jobs <> const j{ jobFile };
 const auto size = j.size();
 auto const batch_size = size / threadCnt;
@@ -118,7 +119,7 @@ void mandel_thread(int const start, int const end) {
 
 		spanReal = real(j.get_size(i));
 		spanImg = imag(j.get_size(i));
-		mandelOnePicture( i, leftReal, lowerImg, spanReal, spanImg);
+		mandelOnePicture(i, leftReal, lowerImg, spanReal, spanImg);
 	}
 }
 
@@ -171,7 +172,7 @@ void calc_on_cpu_tasks() {
 	}
 }
 
-void calc_on_gpu() {
+void launch_kernel(int const start) {
 	std::cout << "start gpu" << std::endl;
 
 	int count{ -1 };
@@ -202,8 +203,9 @@ void calc_on_gpu() {
 		pfc::pixel_t* dPuffer{};
 		check(cudaMalloc(&dPuffer, width * height * sizeof(pfc::pixel_t)));
 
-		for (int i = 0; i < size; i++)
+		for (int i = start; i < size; i = i + threadCntGPU)
 		{
+			//std::cout << "gpu img " << i << std::endl;
 			hLeftReal = real(j.get_lower_left(i));
 			hLowerImg = imag(j.get_lower_left(i));
 
@@ -229,6 +231,23 @@ void calc_on_gpu() {
 		check(cudaFree(dSpanReal));
 		check(cudaFree(dLowerImg));
 		check(cudaFree(dLeftReal));
+	}
+}
+
+void calc_on_gpu()
+{
+	std::cout << "start gpu threads" << std::endl;
+	std::vector<std::thread> threads = {};
+	threads.resize(threadCnt);
+
+	for (size_t i = 0; i < threadCntGPU; i++)
+	{
+		threads[i] = std::thread{ launch_kernel, i };
+	}
+
+	for (int i = threadCntGPU - 1; i >= 0; i--)
+	{
+		threads[i].join();
 	}
 	check(cudaDeviceReset());
 }

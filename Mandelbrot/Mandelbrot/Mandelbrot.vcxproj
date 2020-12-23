@@ -82,7 +82,10 @@
     </Link>
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>
+      <CodeGeneration>compute_61,sm_61</CodeGeneration>
+      <FastMath>false</FastMath>
     </CudaCompile>
+    <CudaLink />
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />

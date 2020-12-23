@@ -1,4 +1,6 @@
 #pragma once
+#define CUDA_API_PER_THREAD_DEFAULT_STREAM
+
 #include "./bitmap.h"
 
 #include <cuda_runtime.h>
