@@ -17,10 +17,10 @@ const auto save_images{ false };
 auto const cpu_seq{ false };
 auto const cpu_thread{ false };
 auto const threadCnt{ 6 };
-auto const cpu_task{ true };
+auto const cpu_task{ false };
 auto const gpu{ true };
 
-const auto jobFile{ "./jobs-010.txt" };
+const auto jobFile{"C:/GIT/MPV/Mandelbrot/Mandelbrot/Mandelbrot/jobs-200.txt" };
 jobs <> const j{ jobFile };
 const auto size = j.size();
 auto const batch_size = size / threadCnt;
@@ -43,6 +43,27 @@ auto timed_run(F&& f, A &&... a)
 }
 
 // Mandelbrot
+int value(int x, int y, const float leftReal, const float lowerImg, const float spanReal, const float spanImg) {
+	const float pointReal{ leftReal + spanReal * ((float)x / (float)width) };
+	const float pointImg{ lowerImg + spanImg * ((float)y / (float)height) };
+
+	float zReal{ 0 };
+	float zImg{ 0 };
+	float zReal2{ 0 };
+	float zImg2{ 0 };
+
+	const int maxIterations{ 256 };
+	int iterations{ 0 };
+	while (((zReal2 + zImg2) < 4) && iterations <= maxIterations) {
+		zImg = 2 * zReal * zImg + pointImg;
+		zReal = zReal2 - zImg2 + pointReal;
+		iterations++;
+		zReal2 = zReal * zReal, zImg2 = zImg * zImg;
+	}
+	return iterations;
+}
+
+
 void mandelOnePicture(const int index, const float leftReal, const float lowerImg, const float spanReal, const float spanImg) {
 	pfc::bitmap bmp{ width, height };
 	auto& span{ bmp.pixel_span() };
@@ -194,7 +215,7 @@ void calc_on_gpu() {
 			check(cudaMemcpy(dSpanReal, &hSpanReal, sizeof(float), cudaMemcpyHostToDevice));
 			check(cudaMemcpy(dSpanImg, &hSpanImg, sizeof(float), cudaMemcpyHostToDevice));
 
-			call_mandel_kernel(dLeftReal, dLowerImg, dSpanReal, dSpanImg, dPuffer, width * height, 128);
+			call_mandel_kernel(dLeftReal, dLowerImg, dSpanReal, dSpanImg, dPuffer, width * height);
 
 			check(cudaMemcpy(p_buffer, dPuffer, width * height * sizeof(pfc::pixel_t), cudaMemcpyDeviceToHost));
 
@@ -213,6 +234,8 @@ void calc_on_gpu() {
 }
 
 int main() {
+
+	std::this_thread::sleep_for(std::chrono::milliseconds(2000));
 	std::chrono::nanoseconds elapsed_cpu_seq;
 	std::chrono::nanoseconds elapsed_cpu_thread;
 	std::chrono::nanoseconds elapsed_cpu_task;
